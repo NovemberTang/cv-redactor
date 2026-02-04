@@ -42,13 +42,8 @@ def extract_text_from_pdf(pdf_path):
 
 def redact_pdf(input_pdf_path, output_pdf_path):
     """Redact PII from a PDF and save the redacted version."""
-    # Open the PDF
-    doc = fitz.open(input_pdf_path)
-    
     # Extract text from all pages
-    full_text = ""
-    for page in doc:
-        full_text += page.get_text()
+    full_text = extract_text_from_pdf(input_pdf_path)
     
     # Analyze the text for PII
     analysis_results = analyzer.analyze(
@@ -81,14 +76,20 @@ def redact_pdf(input_pdf_path, output_pdf_path):
     # Add a page with the redacted text
     page = output_doc.new_page(width=612, height=792)  # Letter size
     
-    # Add the redacted text to the page
+    # Add the redacted text to the page with error handling
     rect = fitz.Rect(50, 50, 562, 742)  # Margins
-    page.insert_textbox(rect, redacted_result.text, fontsize=11, fontname="helv", align=0)
+    try:
+        result = page.insert_textbox(rect, redacted_result.text, fontsize=11, fontname="helv", align=0)
+        if result < 0:
+            print(f"Warning: Text may have been truncated. Not all content fit in the text box.")
+    except Exception as e:
+        print(f"Error inserting text into PDF: {e}")
+        output_doc.close()
+        raise
     
     # Save the output PDF
     output_doc.save(output_pdf_path)
     output_doc.close()
-    doc.close()
     
     return redacted_result.text
 
