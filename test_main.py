@@ -138,10 +138,10 @@ class TestCleanCvContentPhone:
     @pytest.mark.xfail(reason="Phone detection requires pattern-based recognizers that may not be fully configured")
     def test_phone_positive_international_format(self, analyzer_engine, anonymizer_engine):
         """Test that international phone numbers are redacted."""
-        text = "Call me at +1-555-123-4567 for details."
+        text = "Call me at +44-20-7372-5330 for details."
         result = clean_cv_content_test(text, analyzer_engine, anonymizer_engine)
         assert "[PHONE]" in result
-        assert "+1-555-123-4567" not in result
+        assert "+44-20-7372-5330" not in result
     
     @pytest.mark.xfail(reason="Phone detection requires pattern-based recognizers that may not be fully configured")
     def test_phone_positive_uk_format(self, analyzer_engine, anonymizer_engine):
@@ -152,12 +152,12 @@ class TestCleanCvContentPhone:
         assert "020 7372 5330" not in result
     
     @pytest.mark.xfail(reason="Phone detection requires pattern-based recognizers that may not be fully configured")
-    def test_phone_positive_us_format(self, analyzer_engine, anonymizer_engine):
-        """Test that US format phone numbers are redacted."""
-        text = "Reach me at (555) 123-4567 anytime."
+    def test_phone_positive_standard_format(self, analyzer_engine, anonymizer_engine):
+        """Test that standard format phone numbers are redacted."""
+        text = "Reach me at 01234 567890 anytime."
         result = clean_cv_content_test(text, analyzer_engine, anonymizer_engine)
         assert "[PHONE]" in result
-        assert "(555) 123-4567" not in result
+        assert "01234 567890" not in result
     
     def test_phone_negative_no_phone(self, analyzer_engine, anonymizer_engine):
         """Test that text without phone numbers is not affected."""
@@ -187,18 +187,18 @@ class TestCleanCvContentLocation:
     
     def test_location_positive_city_only(self, analyzer_engine, anonymizer_engine):
         """Test that city names are redacted."""
-        text = "Based in San Francisco with experience in tech."
+        text = "Based in Manchester with experience in tech."
         result = clean_cv_content_test(text, analyzer_engine, anonymizer_engine)
         assert "[LOCATION]" in result
-        assert "San Francisco" not in result
+        assert "Manchester" not in result
     
-    def test_location_positive_state_country(self, analyzer_engine, anonymizer_engine):
-        """Test that states and countries are redacted."""
-        text = "Originally from California, United States."
+    def test_location_positive_region_country(self, analyzer_engine, anonymizer_engine):
+        """Test that regions and countries are redacted."""
+        text = "Originally from Scotland, United Kingdom."
         result = clean_cv_content_test(text, analyzer_engine, anonymizer_engine)
         assert "[LOCATION]" in result
         # At least one location should be redacted
-        assert "California" not in result or "United States" not in result
+        assert "Scotland" not in result or "United Kingdom" not in result
     
     def test_location_negative_no_location(self, analyzer_engine, anonymizer_engine):
         """Test that text without locations is not affected."""
@@ -272,8 +272,8 @@ class TestCleanCvContentIntegration:
         text = """
         John Smith
         Email: john.smith@example.com
-        Phone: +1-555-123-4567
-        Location: San Francisco, CA
+        Phone: 020 7372 5330
+        Location: Birmingham, England
         My website is www.johnsmith.com
         """
         result = clean_cv_content_test(text, analyzer_engine, anonymizer_engine)
