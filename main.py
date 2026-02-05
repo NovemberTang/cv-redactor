@@ -1,10 +1,25 @@
+import stanza
 from presidio_analyzer import AnalyzerEngine
+from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 import fitz  # PyMuPDF
 
-# Use default analyzer with pattern-based detection (no NLP model needed)
-analyzer = AnalyzerEngine()
+# Auto-download Stanza English model if not present
+try:
+    stanza.Pipeline('en', download_method=None)
+except Exception:
+    print("Downloading Stanza English model (one-time setup)...")
+    stanza.download('en')
+
+configuration = {
+    "nlp_engine_name": "stanza",
+    "models": [{"lang_code": "en", "model_name": "en"}],
+}
+provider = NlpEngineProvider(nlp_configuration=configuration)
+nlp_engine = provider.create_engine()
+
+analyzer = AnalyzerEngine(nlp_engine=nlp_engine, log_decision_process=True)
 anonymizer = AnonymizerEngine()
 
 def clean_cv_content(text):
