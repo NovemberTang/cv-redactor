@@ -5,25 +5,37 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 import fitz  # PyMuPDF
 
-# Auto-download Stanza English model if not present
-try:
-    stanza.Pipeline('en', download_method=None)
-except Exception:
-    print("Downloading Stanza English model (one-time setup)...")
-    stanza.download('en')
+# Global variables for lazy initialization
+_analyzer = None
+_anonymizer = None
 
-configuration = {
-    "nlp_engine_name": "stanza",
-    "models": [{"lang_code": "en", "model_name": "en"}],
-}
-provider = NlpEngineProvider(nlp_configuration=configuration)
-nlp_engine = provider.create_engine()
+def _initialize_engines():
+    """Lazy initialization of analyzer and anonymizer engines."""
+    global _analyzer, _anonymizer
+    
+    if _analyzer is not None and _anonymizer is not None:
+        return
+    
+    # Auto-download Stanza English model if not present
+    try:
+        stanza.Pipeline('en', download_method=None)
+    except Exception:
+        print("Downloading Stanza English model (one-time setup)...")
+        stanza.download('en')
 
-analyzer = AnalyzerEngine(nlp_engine=nlp_engine, log_decision_process=True)
-anonymizer = AnonymizerEngine()
+    configuration = {
+        "nlp_engine_name": "stanza",
+        "models": [{"lang_code": "en", "model_name": "en"}],
+    }
+    provider = NlpEngineProvider(nlp_configuration=configuration)
+    nlp_engine = provider.create_engine()
+
+    _analyzer = AnalyzerEngine(nlp_engine=nlp_engine, log_decision_process=True)
+    _anonymizer = AnonymizerEngine()
 
 def clean_cv_content(text):
-    analysis_results = analyzer.analyze(
+    _initialize_engines()
+    analysis_results = _analyzer.analyze(
         text=text, 
         entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
         language='en',
@@ -38,7 +50,7 @@ def clean_cv_content(text):
         "URL": OperatorConfig("replace", {"new_value": "[URL]"}),
     }
 
-    redacted_result = anonymizer.anonymize(
+    redacted_result = _anonymizer.anonymize(
         text=text,
         analyzer_results=analysis_results,
         operators=operators
@@ -57,6 +69,7 @@ def extract_text_from_pdf(pdf_path):
 
 def redact_pdf(input_pdf_path, output_pdf_path):
     """Redact PII from a PDF by drawing black boxes over sensitive information."""
+    _initialize_engines()
     # Open the original PDF
     doc = fitz.open(input_pdf_path)
     
@@ -66,7 +79,7 @@ def redact_pdf(input_pdf_path, output_pdf_path):
         page_text = page.get_text()
         
         # Analyze the text for PII
-        analysis_results = analyzer.analyze(
+        analysis_results = _analyzer.analyze(
             text=page_text, 
             entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
             language='en',
