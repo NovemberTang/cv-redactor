@@ -3,6 +3,7 @@ from presidio_analyzer import AnalyzerEngine
 from presidio_analyzer.nlp_engine import NlpEngineProvider
 from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
+import fitz  # PyMuPDF
 
 # Auto-download Stanza English model if not present
 try:
@@ -45,7 +46,66 @@ def clean_cv_content(text):
 
     return redacted_result.text
 
-cv_md_path = 'test-resources/cv.md'
-with open(cv_md_path, 'r', encoding='utf-8') as file:
-    cv_text = file.read()
-print(clean_cv_content(cv_text))
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file."""
+    doc = fitz.open(pdf_path)
+    text = ""
+    for page in doc:
+        text += page.get_text()
+    doc.close()
+    return text
+
+def redact_pdf(input_pdf_path, output_pdf_path):
+    """Redact PII from a PDF by drawing black boxes over sensitive information."""
+    # Open the original PDF
+    doc = fitz.open(input_pdf_path)
+    
+    # Process each page
+    for page_num, page in enumerate(doc):
+        # Extract text from the page
+        page_text = page.get_text()
+        
+        # Analyze the text for PII
+        analysis_results = analyzer.analyze(
+            text=page_text, 
+            entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
+            language='en',
+            score_threshold=0.85
+        )
+
+        # For each detected entity, draw a black box over it
+        for result in analysis_results:
+            print(f"Page {page_num + 1}: Detected {result.entity_type} - '{page_text[result.start:result.end]}' (score: {result.score:.2f})")
+            print(f"Entity spans from index {result.start} to {result.end} in the page text.")
+            # Get the text that needs to be redacted
+            redacted_text = page_text[result.start:result.end]
+            print(f"Redacting text: '{redacted_text}'")
+
+            # Search for the text in the page and draw black boxes
+            text_dict = page.get_text("dict")
+            for block in text_dict["blocks"]:
+                if block["type"] == 0:  # Text block
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            span_text = span["text"]
+                            # Check if this span contains the sensitive text
+                            if redacted_text in span_text or any(word in span_text for word in redacted_text.split()):
+                                # Draw a black rectangle over the sensitive text
+                                rect = fitz.Rect(span["bbox"])
+                                page.draw_rect(rect, color=None, fill=(0, 0, 0))
+    
+    # Save the redacted PDF
+    doc.save(output_pdf_path)
+    doc.close()
+    
+    return f"PDF redacted and saved to {output_pdf_path}"
+
+if __name__ == "__main__":
+    cv_pdf_path = 'test-resources/cv.pdf'
+    output_pdf_path = 'test-resources/cv_redacted.pdf'
+    
+    print("Redacting PDF...")
+    redacted_text = redact_pdf(cv_pdf_path, output_pdf_path)
+    print(f"\nRedacted PDF saved to: {output_pdf_path}")
+    print("\nRedacted text preview:")
+    print(redacted_text[:500] + "..." if len(redacted_text) > 500 else redacted_text)
