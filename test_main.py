@@ -5,6 +5,13 @@ from presidio_anonymizer import AnonymizerEngine
 from presidio_anonymizer.entities import OperatorConfig
 
 
+# Constants for PII entity types - matches the entities used in main.clean_cv_content
+PII_ENTITIES = ["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"]
+
+# Score threshold for PII detection - matches the threshold used in main.clean_cv_content
+SCORE_THRESHOLD = 0.85
+
+
 # Set up analyzer with spaCy instead of Stanza for testing
 @pytest.fixture(scope="module")
 def analyzer_engine():
@@ -25,12 +32,16 @@ def anonymizer_engine():
 
 
 def clean_cv_content_test(text, analyzer, anonymizer):
-    """Test version of clean_cv_content that uses spaCy."""
+    """Test version of clean_cv_content that uses spaCy.
+    
+    This function replicates the logic of main.clean_cv_content but uses
+    spaCy instead of Stanza for testing purposes.
+    """
     analysis_results = analyzer.analyze(
         text=text, 
-        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
+        entities=PII_ENTITIES,
         language='en',
-        score_threshold=0.85
+        score_threshold=SCORE_THRESHOLD
     )
 
     operators = {
