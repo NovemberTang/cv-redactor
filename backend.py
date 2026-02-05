@@ -102,6 +102,9 @@ def redact_pdf(input_pdf_path, output_pdf_path):
                         for span in line["spans"]:
                             span_text = span["text"]
                             # Check if this span contains the sensitive text
+                            # Note: This checks for exact text match or word-level match to handle
+                            # cases where text might be split across spans. May over-redact in some
+                            # cases (e.g., 'John' in 'Johnson'), but ensures complete PII removal.
                             if redacted_text in span_text or any(word in span_text for word in redacted_text.split()):
                                 # Draw a black rectangle over the sensitive text
                                 rect = fitz.Rect(span["bbox"])

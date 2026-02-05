@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+import tempfile
 from backend import redact_pdf
 
 st.title("CV Redactor")
@@ -9,9 +10,8 @@ st.write("Upload a PDF CV to redact personally identifiable information (PII)")
 uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
 
 if uploaded_file is not None:
-    # Create a temporary directory if it doesn't exist
-    temp_dir = "/tmp/cv-redactor"
-    os.makedirs(temp_dir, exist_ok=True)
+    # Create a unique temporary directory for this session
+    temp_dir = tempfile.mkdtemp(prefix="cv-redactor-")
     
     # Save uploaded file temporarily
     input_path = os.path.join(temp_dir, "uploaded.pdf")
