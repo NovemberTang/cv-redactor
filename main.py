@@ -56,57 +56,49 @@ def extract_text_from_pdf(pdf_path):
     return text
 
 def redact_pdf(input_pdf_path, output_pdf_path):
-    """Redact PII from a PDF and save the redacted version."""
-    # Extract text from all pages
-    full_text = extract_text_from_pdf(input_pdf_path)
+    """Redact PII from a PDF by drawing black boxes over sensitive information."""
+    # Open the original PDF
+    doc = fitz.open(input_pdf_path)
     
-    # Analyze the text for PII
-    analysis_results = analyzer.analyze(
-        text=full_text, 
-        entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
-        language='en',
-        score_threshold=0.85
-    )
+    # Process each page
+    for page_num, page in enumerate(doc):
+        # Extract text from the page
+        page_text = page.get_text()
+        
+        # Analyze the text for PII
+        analysis_results = analyzer.analyze(
+            text=page_text, 
+            entities=["PERSON", "EMAIL_ADDRESS", "PHONE_NUMBER", "LOCATION", "URL"], 
+            language='en',
+            score_threshold=0.85
+        )
+
+        # For each detected entity, draw a black box over it
+        for result in analysis_results:
+            print(f"Page {page_num + 1}: Detected {result.entity_type} - '{page_text[result.start:result.end]}' (score: {result.score:.2f})")
+            print(f"Entity spans from index {result.start} to {result.end} in the page text.")
+            # Get the text that needs to be redacted
+            redacted_text = page_text[result.start:result.end]
+            print(f"Redacting text: '{redacted_text}'")
+
+            # Search for the text in the page and draw black boxes
+            text_dict = page.get_text("dict")
+            for block in text_dict["blocks"]:
+                if block["type"] == 0:  # Text block
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            span_text = span["text"]
+                            # Check if this span contains the sensitive text
+                            if redacted_text in span_text or any(word in span_text for word in redacted_text.split()):
+                                # Draw a black rectangle over the sensitive text
+                                rect = fitz.Rect(span["bbox"])
+                                page.draw_rect(rect, color=None, fill=(0, 0, 0))
     
-    # Create a mapping of original text to redacted text
-    operators = {
-        "PERSON": OperatorConfig("replace", {"new_value": "[NAME]"}),
-        "EMAIL_ADDRESS": OperatorConfig("replace", {"new_value": "[EMAIL]"}),
-        "PHONE_NUMBER": OperatorConfig("replace", {"new_value": "[PHONE]"}),
-        "LOCATION": OperatorConfig("replace", {"new_value": "[LOCATION]"}),
-        "URL": OperatorConfig("replace", {"new_value": "[URL]"}),
-    }
+    # Save the redacted PDF
+    doc.save(output_pdf_path)
+    doc.close()
     
-    redacted_result = anonymizer.anonymize(
-        text=full_text,
-        analyzer_results=analysis_results,
-        operators=operators
-    )
-    
-    # Create a new PDF with redacted text
-    # For simplicity, we'll create a new document with the redacted text
-    # A more sophisticated approach would overlay redactions on the original PDF
-    output_doc = fitz.open()  # Create a new empty PDF
-    
-    # Add a page with the redacted text
-    page = output_doc.new_page(width=612, height=792)  # Letter size
-    
-    # Add the redacted text to the page with error handling
-    rect = fitz.Rect(50, 50, 562, 742)  # Margins
-    try:
-        result = page.insert_textbox(rect, redacted_result.text, fontsize=11, fontname="helv", align=0)
-        if result < 0:
-            print(f"Warning: Text may have been truncated. Not all content fit in the text box.")
-    except Exception as e:
-        print(f"Error inserting text into PDF: {e}")
-        output_doc.close()
-        raise
-    
-    # Save the output PDF
-    output_doc.save(output_pdf_path)
-    output_doc.close()
-    
-    return redacted_result.text
+    return f"PDF redacted and saved to {output_pdf_path}"
 
 if __name__ == "__main__":
     cv_pdf_path = 'test-resources/cv.pdf'
